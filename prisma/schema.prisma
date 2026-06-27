@@ -1,0 +1,341 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum DeviceStatus {
+  ONLINE
+  OFFLINE
+  FAULT
+}
+
+enum SensorStatus {
+  NORMAL
+  FAULT
+}
+
+enum GasType {
+  CH4
+  O2
+  CO
+  H2S
+  BATTERY
+}
+
+enum AlarmSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum AlarmStatus {
+  ACTIVE
+  ACKED
+  RESOLVED
+}
+
+enum RuleOperator {
+  GT
+  GTE
+  LT
+  LTE
+  EQ
+}
+
+enum FaultStatus {
+  ACTIVE
+  RESOLVED
+}
+
+model User {
+  id           String           @id @default(cuid())
+  username     String           @unique
+  passwordHash String
+  name         String
+  phone        String?
+  email        String?
+  isEnabled    Boolean          @default(true)
+  roles        UserRole[]
+  auditLogs    AuditLog[]
+  alarmActions AlarmActionLog[]
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+}
+
+model Role {
+  id          String           @id @default(cuid())
+  name        String           @unique
+  description String?
+  users       UserRole[]
+  permissions RolePermission[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model Permission {
+  id        String           @id @default(cuid())
+  code      String           @unique
+  name      String
+  module    String
+  roles     RolePermission[]
+  createdAt DateTime         @default(now())
+}
+
+model UserRole {
+  userId     String
+  roleId     String
+  assignedAt DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role       Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  assignedAt   DateTime   @default(now())
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+model Area {
+  id           String        @id @default(cuid())
+  code         String        @unique
+  name         String        @unique
+  description  String?
+  lng          Float
+  lat          Float
+  riskLevel    Int           @default(1)
+  devices      Device[]
+  baseStations BaseStation[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model BaseStation {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  areaId    String
+  lng       Float
+  lat       Float
+  depth     Float
+  area      Area     @relation(fields: [areaId], references: [id])
+  devices   Device[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([areaId])
+}
+
+model Device {
+  id            String              @id @default(cuid())
+  code          String              @unique
+  name          String
+  model         String
+  serialNumber  String              @unique
+  status        DeviceStatus        @default(OFFLINE)
+  areaId        String?
+  baseStationId String?
+  area          Area?               @relation(fields: [areaId], references: [id])
+  baseStation   BaseStation?        @relation(fields: [baseStationId], references: [id])
+  snapshot      DeviceSnapshot?
+  telemetry     TelemetryRecord[]
+  faults        DeviceFault[]
+  alarms        AlarmEvent[]
+  calibrations  CalibrationRecord[]
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  @@index([status])
+  @@index([areaId])
+  @@index([baseStationId])
+}
+
+model DeviceSnapshot {
+  id           String       @id @default(cuid())
+  deviceId     String       @unique
+  device       Device       @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  ch4          Float        @default(0)
+  o2           Float        @default(20.9)
+  co           Float        @default(0)
+  h2s          Float        @default(0)
+  batteryLevel Int          @default(100)
+  lng          Float        @default(0)
+  lat          Float        @default(0)
+  depth        Float        @default(0)
+  status       DeviceStatus @default(OFFLINE)
+  sensorStatus SensorStatus @default(NORMAL)
+  lastSeenAt   DateTime?
+  updatedAt    DateTime     @updatedAt
+
+  @@index([status])
+  @@index([batteryLevel])
+}
+
+model TelemetryRecord {
+  id           String       @id @default(cuid())
+  deviceId     String
+  device       Device       @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  ch4          Float
+  o2           Float
+  co           Float
+  h2s          Float
+  batteryLevel Int
+  lng          Float
+  lat          Float
+  depth        Float
+  onlineStatus DeviceStatus
+  sensorStatus SensorStatus
+  reportedAt   DateTime
+  createdAt    DateTime     @default(now())
+
+  @@index([deviceId, reportedAt])
+  @@index([reportedAt])
+}
+
+model DeviceFault {
+  id         String      @id @default(cuid())
+  deviceId   String
+  device     Device      @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  faultType  String
+  message    String
+  status     FaultStatus @default(ACTIVE)
+  occurredAt DateTime
+  resolvedAt DateTime?
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  @@index([deviceId, status])
+  @@index([occurredAt])
+}
+
+model AlarmRule {
+  id              String        @id @default(cuid())
+  name            String
+  gasType         GasType
+  operator        RuleOperator
+  thresholdValue  Float
+  severity        AlarmSeverity
+  durationSeconds Int           @default(0)
+  enabled         Boolean       @default(true)
+  events          AlarmEvent[]
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([enabled])
+  @@index([gasType])
+}
+
+model AlarmEvent {
+  id             String           @id @default(cuid())
+  deviceId       String
+  ruleId         String?
+  device         Device           @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  rule           AlarmRule?       @relation(fields: [ruleId], references: [id])
+  gasType        GasType
+  severity       AlarmSeverity
+  status         AlarmStatus      @default(ACTIVE)
+  value          Float
+  thresholdValue Float
+  message        String
+  startedAt      DateTime
+  ackedAt        DateTime?
+  resolvedAt     DateTime?
+  actions        AlarmActionLog[]
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@index([deviceId, status])
+  @@index([ruleId, status])
+  @@index([status])
+  @@index([startedAt])
+  @@index([severity])
+}
+
+model AlarmActionLog {
+  id        String     @id @default(cuid())
+  alarmId   String
+  userId    String?
+  action    String
+  remark    String?
+  alarm     AlarmEvent @relation(fields: [alarmId], references: [id], onDelete: Cascade)
+  user      User?      @relation(fields: [userId], references: [id])
+  createdAt DateTime   @default(now())
+
+  @@index([alarmId])
+  @@index([userId])
+}
+
+model Team {
+  id          String          @id @default(cuid())
+  code        String          @unique
+  name        String
+  description String?
+  members     PersonnelTeam[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+}
+
+model Personnel {
+  id        String          @id @default(cuid())
+  code      String          @unique
+  name      String
+  phone     String?
+  position  String?
+  teams     PersonnelTeam[]
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+}
+
+model PersonnelTeam {
+  personnelId String
+  teamId      String
+  assignedAt  DateTime  @default(now())
+  personnel   Personnel @relation(fields: [personnelId], references: [id], onDelete: Cascade)
+  team        Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@id([personnelId, teamId])
+}
+
+model CalibrationRecord {
+  id            String   @id @default(cuid())
+  deviceId      String
+  device        Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  gasType       GasType
+  beforeValue   Float
+  afterValue    Float
+  standardValue Float
+  calibratedBy  String
+  result        String
+  notes         String?
+  calibratedAt  DateTime
+  createdAt     DateTime @default(now())
+
+  @@index([deviceId, calibratedAt])
+  @@index([gasType])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+  action     String
+  module     String
+  resourceId String?
+  detail     String?
+  ip         String?
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([module])
+  @@index([createdAt])
+}
