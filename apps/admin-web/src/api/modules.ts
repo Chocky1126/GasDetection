@@ -1,0 +1,44 @@
+import { http } from './http';
+
+export interface ListResult<T> {
+  items: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export function getOverview() {
+  return http.get('/monitor/overview');
+}
+
+export function getSnapshots(params = {}) {
+  return http.get('/monitor/snapshots', { params });
+}
+
+export function getAlarms(params = {}) {
+  return http.get('/alarms', { params });
+}
+
+export function ackAlarm(id: string) {
+  return http.patch(`/alarms/${id}/ack`);
+}
+
+export function resolveAlarm(id: string) {
+  return http.patch(`/alarms/${id}/resolve`);
+}
+
+export function listResource<T>(endpoint: string, params = {}) {
+  return http.get<ListResult<T>>(endpoint, { params });
+}
+
+export function createResource<T>(endpoint: string, data: T) {
+  return http.post(endpoint, data);
+}
+
+export function updateResource<T>(endpoint: string, id: string, data: T) {
+  return http.patch(`${endpoint}/${id}`, data);
+}
+
+export function deleteResource(endpoint: string, id: string) {
+  return http.delete(`${endpoint}/${id}`);
+}
