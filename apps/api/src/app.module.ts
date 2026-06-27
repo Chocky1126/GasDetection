@@ -13,9 +13,12 @@ import { BaseStationsModule } from './modules/base-stations/base-stations.module
 import { CalibrationsModule } from './modules/calibrations/calibrations.module';
 import { DevicesModule } from './modules/devices/devices.module';
 import { HealthModule } from './modules/health/health.module';
+import { MonitorModule } from './modules/monitor/monitor.module';
+import { MqttModule } from './modules/mqtt/mqtt.module';
 import { PersonnelModule } from './modules/personnel/personnel.module';
 import { PrismaModule } from './modules/prisma/prisma.module';
 import { RedisModule } from './modules/redis/redis.module';
+import { RealtimeModule } from './modules/realtime/realtime.module';
 import { RolesModule } from './modules/roles/roles.module';
 import { TeamsModule } from './modules/teams/teams.module';
 import { UsersModule } from './modules/users/users.module';
@@ -42,6 +45,9 @@ import { UsersModule } from './modules/users/users.module';
     PersonnelModule,
     CalibrationsModule,
     AuditLogsModule,
+    RealtimeModule,
+    MonitorModule,
+    MqttModule,
   ],
   providers: [
     {
