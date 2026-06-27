@@ -1,0 +1,88 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-gas_detection}
+      POSTGRES_USER: ${POSTGRES_USER:-gas_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gas_password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gas_user} -d ${POSTGRES_DB:-gas_detection}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./docker/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-gas_user}:${POSTGRES_PASSWORD:-gas_password}@postgres:5432/${POSTGRES_DB:-gas_detection}?schema=public
+      REDIS_URL: redis://redis:6379
+      MQTT_URL: mqtt://mosquitto:1883
+      JWT_SECRET: ${JWT_SECRET:-local-dev-secret-change-me}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
+      API_PORT: 3000
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mosquitto:
+        condition: service_started
+
+  admin-web:
+    build:
+      context: .
+      dockerfile: apps/admin-web/Dockerfile
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
+
+  screen-web:
+    build:
+      context: .
+      dockerfile: apps/screen-web/Dockerfile
+    ports:
+      - "8081:80"
+    depends_on:
+      - api
+
+  simulator:
+    build:
+      context: .
+      dockerfile: apps/simulator/Dockerfile
+    environment:
+      MQTT_URL: mqtt://mosquitto:1883
+      SIMULATOR_DEVICE_COUNT: ${SIMULATOR_DEVICE_COUNT:-100}
+      SIMULATOR_INTERVAL_MS: ${SIMULATOR_INTERVAL_MS:-3000}
+    depends_on:
+      - api
+      - mosquitto
+
+volumes:
+  postgres_data:
