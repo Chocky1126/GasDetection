@@ -37,6 +37,12 @@ cp .env.example .env
 docker compose up --build
 ```
 
+也可以使用带环境检查的一键脚本：
+
+```bash
+./scripts/docker-up.sh
+```
+
 服务地址：
 
 ```text
@@ -54,6 +60,13 @@ API 容器启动时会执行：
 ```bash
 pnpm prisma db push --schema prisma/schema.prisma
 pnpm prisma:seed
+```
+
+如果构建卡在依赖下载，可以在 `.env` 中调整镜像源：
+
+```text
+NPM_REGISTRY=https://registry.npmmirror.com
+PNPM_VERSION=11.7.0
 ```
 
 ## 本地开发

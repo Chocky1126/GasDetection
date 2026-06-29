@@ -36,6 +36,9 @@ services:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
+      args:
+        PNPM_VERSION: ${PNPM_VERSION:-11.7.0}
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
     environment:
       NODE_ENV: production
       DATABASE_URL: postgresql://${POSTGRES_USER:-gas_user}:${POSTGRES_PASSWORD:-gas_password}@postgres:5432/${POSTGRES_DB:-gas_detection}?schema=public
@@ -58,6 +61,9 @@ services:
     build:
       context: .
       dockerfile: apps/admin-web/Dockerfile
+      args:
+        PNPM_VERSION: ${PNPM_VERSION:-11.7.0}
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
     ports:
       - "8080:80"
     depends_on:
@@ -67,6 +73,9 @@ services:
     build:
       context: .
       dockerfile: apps/screen-web/Dockerfile
+      args:
+        PNPM_VERSION: ${PNPM_VERSION:-11.7.0}
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
     ports:
       - "8081:80"
     depends_on:
@@ -76,6 +85,9 @@ services:
     build:
       context: .
       dockerfile: apps/simulator/Dockerfile
+      args:
+        PNPM_VERSION: ${PNPM_VERSION:-11.7.0}
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
     environment:
       MQTT_URL: mqtt://mosquitto:1883
       SIMULATOR_DEVICE_COUNT: ${SIMULATOR_DEVICE_COUNT:-100}
