@@ -1,4 +1,4 @@
-import { SimulatorService } from './simulator.service';
+import { SimulatorService } from './simulator.service.js';
 
 const simulator = new SimulatorService({
   mqttUrl: process.env.MQTT_URL ?? 'mqtt://localhost:1883',

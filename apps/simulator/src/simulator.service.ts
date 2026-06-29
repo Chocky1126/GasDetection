@@ -1,6 +1,6 @@
 import mqtt, { MqttClient } from 'mqtt';
-import { createDevices, SimulatedDevice } from './device-factory';
-import { deviceStatusTopic, deviceTelemetryTopic, generateTelemetry } from './telemetry';
+import { createDevices, type SimulatedDevice } from './device-factory.js';
+import { deviceStatusTopic, deviceTelemetryTopic, generateTelemetry } from './telemetry.js';
 
 export interface SimulatorOptions {
   mqttUrl: string;

@@ -20,9 +20,15 @@ if [ ! -f .env ]; then
   echo "Created .env from .env.example"
 fi
 
-docker compose build --progress=plain
-docker compose up -d
-docker compose ps
+compose_project_name="${COMPOSE_PROJECT_NAME:-gas-detection}"
+export COMPOSE_BAKE="${COMPOSE_BAKE:-false}"
+
+for service in api admin-web screen-web simulator; do
+  docker compose -p "$compose_project_name" --progress plain build "$service"
+done
+
+docker compose -p "$compose_project_name" up -d
+docker compose -p "$compose_project_name" ps
 
 cat <<'URLS'
 

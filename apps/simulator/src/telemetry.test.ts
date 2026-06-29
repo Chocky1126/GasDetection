@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { createDevices } from './device-factory';
-import { generateTelemetry } from './telemetry';
+import { createDevices } from './device-factory.js';
+import { generateTelemetry } from './telemetry.js';
 
 describe('simulator telemetry', () => {
   it('creates deterministic device codes', () => {

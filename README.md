@@ -69,6 +69,8 @@ NPM_REGISTRY=https://registry.npmmirror.com
 PNPM_VERSION=11.7.0
 ```
 
+项目目录可以使用中文名；Compose 项目名已固定为 `gas-detection`。
+
 ## 本地开发
 
 ```bash

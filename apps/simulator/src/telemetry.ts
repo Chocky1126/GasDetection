@@ -1,4 +1,4 @@
-import { SimulatedDevice } from './device-factory';
+import type { SimulatedDevice } from './device-factory.js';
 
 export type DeviceStatus = 'ONLINE' | 'OFFLINE' | 'FAULT';
 export type SensorStatus = 'NORMAL' | 'FAULT';
