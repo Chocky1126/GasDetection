@@ -101,7 +101,7 @@
       <el-form :model="form" label-position="top" class="create-form">
         <div class="number-grid">
           <el-form-item label="设备">
-            <el-select v-model="form.deviceId" filterable placeholder="选择设备">
+            <el-select v-model="form.deviceId" filterable placeholder="选择设备" :loading="optionsLoading">
               <el-option
                 v-for="item in deviceOptions"
                 :key="item.id"
@@ -124,7 +124,7 @@
             />
           </el-form-item>
           <el-form-item label="标定人">
-            <el-select v-model="form.calibratedById" clearable filterable placeholder="选择人员">
+            <el-select v-model="form.calibratedById" clearable filterable placeholder="选择人员" :loading="optionsLoading">
               <el-option
                 v-for="item in personnelOptions"
                 :key="item.id"
@@ -134,7 +134,7 @@
             </el-select>
           </el-form-item>
           <el-form-item label="班组">
-            <el-select v-model="form.teamId" clearable filterable placeholder="选择班组">
+            <el-select v-model="form.teamId" clearable filterable placeholder="选择班组" :loading="optionsLoading">
               <el-option
                 v-for="item in teamOptions"
                 :key="item.id"
@@ -194,13 +194,26 @@
 <script setup lang="ts">
 import { Plus, Refresh, Search, View } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { createCalibration, getCalibrationOverview, listResource } from '../api/modules';
+
+interface CalibrationForm {
+  deviceId: string;
+  gasType: string;
+  calibratedById: string;
+  teamId: string;
+  standardValue: number | null;
+  beforeValue: number | null;
+  afterValue: number | null;
+  calibratedAt: Date | string | null;
+  notes: string;
+}
 
 const rows = ref<any[]>([]);
 const total = ref(0);
 const loading = ref(false);
 const submitting = ref(false);
+const optionsLoading = ref(false);
 const overview = ref<any>({});
 const createDialog = ref(false);
 const detailDrawer = ref(false);
@@ -208,6 +221,7 @@ const selectedCalibration = ref<any>(null);
 const deviceOptions = ref<any[]>([]);
 const personnelOptions = ref<any[]>([]);
 const teamOptions = ref<any[]>([]);
+const viewportWidth = ref(currentViewportWidth());
 
 const filters = reactive({
   keyword: '',
@@ -218,14 +232,14 @@ const filters = reactive({
   pageSize: 20,
 });
 
-const form = reactive({
+const form = reactive<CalibrationForm>({
   deviceId: '',
   gasType: 'CH4',
   calibratedById: '',
   teamId: '',
-  standardValue: 0,
-  beforeValue: 0,
-  afterValue: 0,
+  standardValue: 1,
+  beforeValue: 1,
+  afterValue: 1,
   calibratedAt: new Date(),
   notes: '',
 });
@@ -243,7 +257,15 @@ const metricCards = computed(() => [
   { label: '失败', value: overview.value.failedRecords ?? 0, color: '#dc2626' },
 ]);
 
-const drawerSize = computed(() => (window.innerWidth < 640 ? '100%' : '520px'));
+const drawerSize = computed(() => (viewportWidth.value < 640 ? '100%' : '520px'));
+
+function currentViewportWidth() {
+  return typeof window === 'undefined' ? 1024 : window.innerWidth;
+}
+
+function updateViewportWidth() {
+  viewportWidth.value = currentViewportWidth();
+}
 
 function params() {
   return Object.fromEntries(Object.entries(filters).filter(([, value]) => value !== '' && value !== undefined));
@@ -265,14 +287,21 @@ async function load() {
 }
 
 async function loadOptions() {
-  const [devices, personnel, teams]: any[] = await Promise.all([
-    listResource('/devices', { pageSize: 100 }),
-    listResource('/personnel', { pageSize: 100 }),
-    listResource('/teams', { pageSize: 100 }),
-  ]);
-  deviceOptions.value = devices.items ?? devices;
-  personnelOptions.value = personnel.items ?? personnel;
-  teamOptions.value = teams.items ?? teams;
+  optionsLoading.value = true;
+  try {
+    const [devices, personnel, teams]: any[] = await Promise.all([
+      listResource('/devices', { pageSize: 100 }),
+      listResource('/personnel', { pageSize: 100 }),
+      listResource('/teams', { pageSize: 100 }),
+    ]);
+    deviceOptions.value = devices.items ?? devices;
+    personnelOptions.value = personnel.items ?? personnel;
+    teamOptions.value = teams.items ?? teams;
+  } catch {
+    ElMessage.error('基础选项加载失败');
+  } finally {
+    optionsLoading.value = false;
+  }
 }
 
 function search() {
@@ -299,9 +328,9 @@ function openCreate() {
     gasType: 'CH4',
     calibratedById: '',
     teamId: '',
-    standardValue: 0,
-    beforeValue: 0,
-    afterValue: 0,
+    standardValue: 1,
+    beforeValue: 1,
+    afterValue: 1,
     calibratedAt: new Date(),
     notes: '',
   });
@@ -318,6 +347,14 @@ async function submitCreate() {
     ElMessage.warning('请填写设备、气体和标定时间');
     return;
   }
+  const numbers = validateCalibrationValues();
+  if (!numbers) return;
+
+  const calibratedAt = new Date(form.calibratedAt);
+  if (!Number.isFinite(calibratedAt.getTime())) {
+    ElMessage.warning('请选择有效的标定时间');
+    return;
+  }
 
   submitting.value = true;
   try {
@@ -326,10 +363,10 @@ async function submitCreate() {
       gasType: form.gasType,
       calibratedById: form.calibratedById || undefined,
       teamId: form.teamId || undefined,
-      standardValue: Number(form.standardValue),
-      beforeValue: Number(form.beforeValue),
-      afterValue: Number(form.afterValue),
-      calibratedAt: new Date(form.calibratedAt).toISOString(),
+      standardValue: numbers.standardValue,
+      beforeValue: numbers.beforeValue,
+      afterValue: numbers.afterValue,
+      calibratedAt: calibratedAt.toISOString(),
       notes: form.notes || undefined,
     });
     createDialog.value = false;
@@ -338,6 +375,30 @@ async function submitCreate() {
   } finally {
     submitting.value = false;
   }
+}
+
+function validateCalibrationValues() {
+  const standardValue = finiteNumber(form.standardValue);
+  const beforeValue = finiteNumber(form.beforeValue);
+  const afterValue = finiteNumber(form.afterValue);
+
+  if (standardValue === null || beforeValue === null || afterValue === null) {
+    ElMessage.warning('请填写有效的标定数值');
+    return null;
+  }
+  if (standardValue <= 0) {
+    ElMessage.warning('标准值必须大于 0');
+    return null;
+  }
+  if (beforeValue < 0 || afterValue < 0) {
+    ElMessage.warning('标定前和标定后不能小于 0');
+    return null;
+  }
+  return { standardValue, beforeValue, afterValue };
+}
+
+function finiteNumber(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
 function resultText(result: string) {
@@ -365,8 +426,18 @@ function optionLabel(item: any, fields: string[]) {
 }
 
 onMounted(() => {
+  updateViewportWidth();
+  if (typeof window !== 'undefined') {
+    window.addEventListener('resize', updateViewportWidth);
+  }
   void load();
   void loadOptions();
+});
+
+onBeforeUnmount(() => {
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('resize', updateViewportWidth);
+  }
 });
 </script>
 
@@ -427,13 +498,20 @@ onMounted(() => {
 }
 
 @media (max-width: 1100px) {
-  .calibration-metrics,
+  .calibration-metrics {
+    grid-template-columns: repeat(3, minmax(120px, 1fr));
+  }
+
   .number-grid {
     grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 640px) {
+  .calibration-metrics {
+    grid-template-columns: 1fr;
+  }
+
   .toolbar {
     align-items: flex-start;
     gap: 10px;
