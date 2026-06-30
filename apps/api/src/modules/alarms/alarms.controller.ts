@@ -58,6 +58,6 @@ export class AlarmsController {
 
   private async emitAlarmChanged(alarm: unknown) {
     this.realtimeGateway.emitAlarmUpdated(alarm);
-    this.realtimeGateway.emitScreenOverviewUpdated(await this.monitorService.getOverview());
+    this.realtimeGateway.emitScreenMetricsUpdated(await this.monitorService.getScreenMetrics());
   }
 }

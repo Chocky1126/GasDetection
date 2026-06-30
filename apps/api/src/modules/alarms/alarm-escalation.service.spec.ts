@@ -23,7 +23,7 @@ describe('AlarmEscalationService', () => {
       escalatedAt: now,
       actions: [{ action: 'ESCALATE' }],
     };
-    const overview = { totalDevices: 100, activeAlarms: 1 };
+    const metrics = { overview: { totalDevices: 100, activeAlarms: 1 }, areaRiskRanking: [] };
     const tx = {
       alarmEvent: {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
@@ -45,8 +45,12 @@ describe('AlarmEscalationService', () => {
     const gateway = {
       emitAlarmUpdated: jest.fn(),
       emitScreenOverviewUpdated: jest.fn(),
+      emitScreenMetricsUpdated: jest.fn(),
     } as unknown as RealtimeGateway;
-    const monitorService = { getOverview: jest.fn().mockResolvedValue(overview) } as unknown as MonitorService;
+    const monitorService = {
+      getOverview: jest.fn().mockResolvedValue(metrics.overview),
+      getScreenMetrics: jest.fn().mockResolvedValue(metrics),
+    } as unknown as MonitorService;
     const service = new AlarmEscalationService(prisma, gateway, monitorService);
 
     const result = await service.scanAndEscalate(now);
@@ -80,8 +84,8 @@ describe('AlarmEscalationService', () => {
       },
     });
     expect(gateway.emitAlarmUpdated).toHaveBeenCalledWith({ ...updatedAlarm, latestAction: 'ESCALATE' });
-    expect(monitorService.getOverview).toHaveBeenCalled();
-    expect(gateway.emitScreenOverviewUpdated).toHaveBeenCalledWith(overview);
+    expect(monitorService.getScreenMetrics).toHaveBeenCalled();
+    expect((gateway as any).emitScreenMetricsUpdated).toHaveBeenCalledWith(metrics);
   });
 
   it('keeps critical severity at critical', () => {
@@ -123,6 +127,7 @@ describe('AlarmEscalationService', () => {
     const gateway = {
       emitAlarmUpdated: jest.fn(),
       emitScreenOverviewUpdated: jest.fn(),
+      emitScreenMetricsUpdated: jest.fn(),
     } as unknown as RealtimeGateway;
     const service = new AlarmEscalationService(prisma, gateway, {} as MonitorService);
 
@@ -133,6 +138,7 @@ describe('AlarmEscalationService', () => {
     expect(prisma.alarmActionLog.create).not.toHaveBeenCalled();
     expect(gateway.emitAlarmUpdated).not.toHaveBeenCalled();
     expect(gateway.emitScreenOverviewUpdated).not.toHaveBeenCalled();
+    expect((gateway as any).emitScreenMetricsUpdated).not.toHaveBeenCalled();
   });
 
   it('skips logging and realtime events when the guarded update loses the race', async () => {
@@ -164,8 +170,9 @@ describe('AlarmEscalationService', () => {
     const gateway = {
       emitAlarmUpdated: jest.fn(),
       emitScreenOverviewUpdated: jest.fn(),
+      emitScreenMetricsUpdated: jest.fn(),
     } as unknown as RealtimeGateway;
-    const monitorService = { getOverview: jest.fn() } as unknown as MonitorService;
+    const monitorService = { getOverview: jest.fn(), getScreenMetrics: jest.fn() } as unknown as MonitorService;
     const service = new AlarmEscalationService(prisma, gateway, monitorService);
 
     const result = await service.scanAndEscalate(now);
@@ -174,7 +181,8 @@ describe('AlarmEscalationService', () => {
     expect(tx.alarmActionLog.create).not.toHaveBeenCalled();
     expect(tx.alarmEvent.findUnique).not.toHaveBeenCalled();
     expect(gateway.emitAlarmUpdated).not.toHaveBeenCalled();
-    expect(monitorService.getOverview).not.toHaveBeenCalled();
+    expect(monitorService.getScreenMetrics).not.toHaveBeenCalled();
     expect(gateway.emitScreenOverviewUpdated).not.toHaveBeenCalled();
+    expect((gateway as any).emitScreenMetricsUpdated).not.toHaveBeenCalled();
   });
 });

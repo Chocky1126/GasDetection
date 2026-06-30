@@ -4,18 +4,20 @@ import { AlarmsController } from './alarms.controller';
 import { AlarmsService } from './alarms.service';
 
 describe('AlarmsController', () => {
-  it('emits realtime alarm and overview updates after acknowledging an alarm', async () => {
+  it('emits realtime alarm and screen metrics updates after acknowledging an alarm', async () => {
     const alarm = { id: 'alarm-1', status: 'ACKED' };
-    const overview = { totalDevices: 100, activeAlarms: 2 };
+    const metrics = { overview: { totalDevices: 100, activeAlarms: 2 }, areaRiskRanking: [] };
     const alarmsService = {
       ack: jest.fn().mockResolvedValue(alarm),
     } as unknown as AlarmsService;
     const realtimeGateway = {
       emitAlarmUpdated: jest.fn(),
       emitScreenOverviewUpdated: jest.fn(),
+      emitScreenMetricsUpdated: jest.fn(),
     } as unknown as RealtimeGateway;
     const monitorService = {
-      getOverview: jest.fn().mockResolvedValue(overview),
+      getOverview: jest.fn().mockResolvedValue(metrics.overview),
+      getScreenMetrics: jest.fn().mockResolvedValue(metrics),
     } as unknown as MonitorService;
     const controller = new AlarmsController(alarmsService, realtimeGateway, monitorService);
 
@@ -23,22 +25,24 @@ describe('AlarmsController', () => {
 
     expect(alarmsService.ack).toHaveBeenCalledWith('alarm-1', 'user-1', '已确认');
     expect(realtimeGateway.emitAlarmUpdated).toHaveBeenCalledWith(alarm);
-    expect(monitorService.getOverview).toHaveBeenCalled();
-    expect(realtimeGateway.emitScreenOverviewUpdated).toHaveBeenCalledWith(overview);
+    expect(monitorService.getScreenMetrics).toHaveBeenCalled();
+    expect((realtimeGateway as any).emitScreenMetricsUpdated).toHaveBeenCalledWith(metrics);
   });
 
-  it('emits realtime alarm and overview updates after resolving an alarm', async () => {
+  it('emits realtime alarm and screen metrics updates after resolving an alarm', async () => {
     const alarm = { id: 'alarm-1', status: 'RESOLVED' };
-    const overview = { totalDevices: 100, activeAlarms: 1 };
+    const metrics = { overview: { totalDevices: 100, activeAlarms: 1 }, areaRiskRanking: [] };
     const alarmsService = {
       resolve: jest.fn().mockResolvedValue(alarm),
     } as unknown as AlarmsService;
     const realtimeGateway = {
       emitAlarmUpdated: jest.fn(),
       emitScreenOverviewUpdated: jest.fn(),
+      emitScreenMetricsUpdated: jest.fn(),
     } as unknown as RealtimeGateway;
     const monitorService = {
-      getOverview: jest.fn().mockResolvedValue(overview),
+      getOverview: jest.fn().mockResolvedValue(metrics.overview),
+      getScreenMetrics: jest.fn().mockResolvedValue(metrics),
     } as unknown as MonitorService;
     const controller = new AlarmsController(alarmsService, realtimeGateway, monitorService);
 
@@ -46,7 +50,7 @@ describe('AlarmsController', () => {
 
     expect(alarmsService.resolve).toHaveBeenCalledWith('alarm-1', 'user-1', '已解除');
     expect(realtimeGateway.emitAlarmUpdated).toHaveBeenCalledWith(alarm);
-    expect(monitorService.getOverview).toHaveBeenCalled();
-    expect(realtimeGateway.emitScreenOverviewUpdated).toHaveBeenCalledWith(overview);
+    expect(monitorService.getScreenMetrics).toHaveBeenCalled();
+    expect((realtimeGateway as any).emitScreenMetricsUpdated).toHaveBeenCalledWith(metrics);
   });
 });

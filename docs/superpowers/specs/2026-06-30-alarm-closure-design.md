@@ -175,7 +175,7 @@ ACTIVE -> RESOLVED
 
 - 实时报警列表展示升级标记。
 - 区域风险排行计算时，升级报警权重高于普通 ACTIVE 报警。
-- 收到 `alarm.updated` 和 `screen.overview.updated` 后刷新大屏数据。
+- 收到 `alarm.updated`、`screen.overview.updated` 和 `screen.metrics.updated` 后刷新大屏数据。
 
 ## WebSocket
 
@@ -185,6 +185,7 @@ ACTIVE -> RESOLVED
 alarm.created
 alarm.updated
 screen.overview.updated
+screen.metrics.updated
 ```
 
 `alarm.updated` 负载需要包含：

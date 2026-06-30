@@ -5,4 +5,5 @@ export const RealtimeEvents = {
   AlarmUpdated: 'alarm.updated',
   DeviceStatusChanged: 'device.status.changed',
   ScreenOverviewUpdated: 'screen.overview.updated',
+  ScreenMetricsUpdated: 'screen.metrics.updated',
 } as const;

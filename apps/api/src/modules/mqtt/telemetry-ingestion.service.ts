@@ -100,7 +100,7 @@ export class TelemetryIngestionService {
     for (const alarm of alarmChanges.resolved) {
       this.realtimeGateway.emitAlarmUpdated(alarm);
     }
-    this.realtimeGateway.emitScreenOverviewUpdated(await this.monitorService.getOverview());
+    this.realtimeGateway.emitScreenMetricsUpdated(await this.monitorService.getScreenMetrics());
 
     return { telemetry, snapshot, alarmChanges };
   }

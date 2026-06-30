@@ -92,4 +92,28 @@ describe('MonitorService', () => {
     });
     expect(result[1]).toEqual(expect.objectContaining({ areaId: 'area-2', escalatedAlarms: 0, riskScore: 11 }));
   });
+
+  it('builds a complete realtime metrics payload for the data screen', async () => {
+    const service = new MonitorService({} as PrismaService);
+    const overview = { totalDevices: 100, activeAlarms: 3 };
+    const trends = [{ deviceId: 'device-1', ch4: 0.3 }];
+    const statusDistribution = [{ status: DeviceStatus.ONLINE, count: 82 }];
+    const areaRiskRanking = [{ areaId: 'area-1', areaName: 'A区', riskScore: 25 }];
+    jest.spyOn(service, 'getOverview').mockResolvedValue(overview as any);
+    jest.spyOn(service, 'getTrends').mockResolvedValue(trends as any);
+    jest.spyOn(service, 'getStatusDistribution').mockResolvedValue(statusDistribution as any);
+    jest.spyOn(service, 'getAreaRiskRanking').mockResolvedValue(areaRiskRanking as any);
+
+    const getScreenMetrics = (service as any).getScreenMetrics;
+    expect(typeof getScreenMetrics).toBe('function');
+
+    await expect(getScreenMetrics.call(service)).resolves.toEqual({
+      overview,
+      trends,
+      statusDistribution,
+      areaRiskRanking,
+    });
+
+    expect(service.getTrends).toHaveBeenCalledWith(120);
+  });
 });

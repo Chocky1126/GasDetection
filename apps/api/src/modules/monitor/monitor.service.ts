@@ -91,4 +91,20 @@ export class MonitorService {
       })
       .sort((left, right) => right.riskScore - left.riskScore);
   }
+
+  async getScreenMetrics(limit = 120) {
+    const [overview, trends, statusDistribution, areaRiskRanking] = await Promise.all([
+      this.getOverview(),
+      this.getTrends(limit),
+      this.getStatusDistribution(),
+      this.getAreaRiskRanking(),
+    ]);
+
+    return {
+      overview,
+      trends,
+      statusDistribution,
+      areaRiskRanking,
+    };
+  }
 }

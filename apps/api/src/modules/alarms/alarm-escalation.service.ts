@@ -84,7 +84,7 @@ export class AlarmEscalationService {
     }
 
     if (escalated > 0) {
-      this.realtimeGateway.emitScreenOverviewUpdated(await this.monitorService.getOverview());
+      this.realtimeGateway.emitScreenMetricsUpdated(await this.monitorService.getScreenMetrics());
     }
 
     return { scanned: candidates.length, escalated };
