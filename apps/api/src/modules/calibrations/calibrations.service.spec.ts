@@ -264,26 +264,35 @@ describe('CalibrationsService', () => {
       { dueStatus: 'OVERDUE' },
       { dueStatus: 'FAILED' },
     ]);
+    const count = jest
+      .fn()
+      .mockResolvedValueOnce(20)
+      .mockResolvedValueOnce(2)
+      .mockResolvedValueOnce(3)
+      .mockResolvedValueOnce(4);
     const prisma = {
       calibrationRecord: {
-        count: jest
-          .fn()
-          .mockResolvedValueOnce(20)
-          .mockResolvedValueOnce(2)
-          .mockResolvedValueOnce(3)
-          .mockResolvedValueOnce(4),
+        count,
       },
     } as unknown as PrismaService;
     const service = new CalibrationsService(prisma);
     jest.spyOn(service, 'dueDevices').mockImplementation(dueDevices);
+    const now = new Date('2026-06-30T12:00:00.000Z');
+    const startOfToday = new Date(now);
+    startOfToday.setHours(0, 0, 0, 0);
+    const startOfTomorrow = new Date(startOfToday);
+    startOfTomorrow.setDate(startOfTomorrow.getDate() + 1);
 
-    await expect(service.overview(new Date('2026-06-30T12:00:00.000Z'))).resolves.toEqual({
+    await expect(service.overview(now)).resolves.toEqual({
       totalRecords: 20,
       todayCompleted: 2,
       dueSoonItems: 1,
       overdueItems: 1,
       failedRecords: 3,
       needRecheckRecords: 4,
+    });
+    expect(count).toHaveBeenNthCalledWith(2, {
+      where: { calibratedAt: { gte: startOfToday, lt: startOfTomorrow } },
     });
   });
 
@@ -323,8 +332,8 @@ describe('CalibrationsService', () => {
     expect(result).toEqual([
       expect.objectContaining({ deviceId: 'device-1', gasType: GasType.CH4, dueStatus: 'DUE_SOON' }),
       expect.objectContaining({ deviceId: 'device-1', gasType: GasType.O2, dueStatus: 'FAILED' }),
-      expect.objectContaining({ deviceId: 'device-1', gasType: GasType.CO, dueStatus: 'OVERDUE' }),
-      expect.objectContaining({ deviceId: 'device-1', gasType: GasType.H2S, dueStatus: 'OVERDUE' }),
+      expect.objectContaining({ deviceId: 'device-1', gasType: GasType.CO, dueStatus: 'OVERDUE', nextDueAt: null }),
+      expect.objectContaining({ deviceId: 'device-1', gasType: GasType.H2S, dueStatus: 'OVERDUE', nextDueAt: null }),
     ]);
   });
 });

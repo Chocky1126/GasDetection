@@ -73,9 +73,11 @@ export class CalibrationsService {
   async overview(now = new Date()) {
     const startOfToday = new Date(now);
     startOfToday.setHours(0, 0, 0, 0);
+    const startOfTomorrow = new Date(startOfToday);
+    startOfTomorrow.setDate(startOfTomorrow.getDate() + 1);
     const [totalRecords, todayCompleted, failedRecords, needRecheckRecords, dueItems] = await Promise.all([
       this.prisma.calibrationRecord.count(),
-      this.prisma.calibrationRecord.count({ where: { calibratedAt: { gte: startOfToday } } }),
+      this.prisma.calibrationRecord.count({ where: { calibratedAt: { gte: startOfToday, lt: startOfTomorrow } } }),
       this.prisma.calibrationRecord.count({ where: { result: CalibrationResult.FAIL } }),
       this.prisma.calibrationRecord.count({ where: { result: CalibrationResult.NEED_RECHECK } }),
       this.dueDevices(now),
@@ -121,7 +123,7 @@ export class CalibrationsService {
           areaName: device.area?.name,
           baseStationName: device.baseStation?.name,
           latestCalibration,
-          nextDueAt: latestCalibration?.nextDueAt,
+          nextDueAt: latestCalibration?.nextDueAt ?? null,
           dueStatus: this.dueStatusFor(latestCalibration, now),
         };
       }),
