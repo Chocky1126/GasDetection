@@ -2,9 +2,14 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { CalibrationResult, GasType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CalibrationsService } from './calibrations.service';
+import { CalibrationDueStatus } from './dto/calibration-query.dto';
 
 describe('CalibrationsService', () => {
   const calibratedAt = new Date('2026-06-30T08:00:00.000Z');
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
 
   it('calculates pass, recheck, fail, and zero-standard results', () => {
     const service = new CalibrationsService({} as PrismaService);
@@ -124,5 +129,132 @@ describe('CalibrationsService', () => {
         calibratedAt: calibratedAt.toISOString(),
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
+
+    const serviceMissingTeam = new CalibrationsService({
+      device: { findUnique: jest.fn().mockResolvedValue({ id: 'device-1' }) },
+      team: { findUnique: jest.fn().mockResolvedValue(null) },
+    } as unknown as PrismaService);
+
+    await expect(
+      serviceMissingTeam.create({
+        deviceId: 'device-1',
+        gasType: GasType.CH4,
+        standardValue: 1,
+        beforeValue: 1,
+        afterValue: 1,
+        teamId: 'missing-team',
+        calibratedAt: calibratedAt.toISOString(),
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('calculates due status boundaries', () => {
+    const service = new CalibrationsService({} as PrismaService);
+    const now = new Date('2026-06-30T08:00:00.000Z');
+
+    expect(service.dueStatusFor(null, now)).toBe(CalibrationDueStatus.OVERDUE);
+    expect(service.dueStatusFor({ result: CalibrationResult.FAIL, nextDueAt: now }, now)).toBe(
+      CalibrationDueStatus.FAILED,
+    );
+    expect(service.dueStatusFor({ result: CalibrationResult.NEED_RECHECK, nextDueAt: now }, now)).toBe(
+      CalibrationDueStatus.FAILED,
+    );
+    expect(
+      service.dueStatusFor({ result: CalibrationResult.PASS, nextDueAt: new Date('2026-06-30T07:59:59.999Z') }, now),
+    ).toBe(CalibrationDueStatus.OVERDUE);
+    expect(
+      service.dueStatusFor({ result: CalibrationResult.PASS, nextDueAt: new Date('2026-07-07T08:00:00.000Z') }, now),
+    ).toBe(CalibrationDueStatus.DUE_SOON);
+    expect(
+      service.dueStatusFor({ result: CalibrationResult.PASS, nextDueAt: new Date('2026-07-07T08:00:00.001Z') }, now),
+    ).toBe(CalibrationDueStatus.NORMAL);
+  });
+
+  it('forwards list filters into Prisma where', async () => {
+    const findMany = jest.fn().mockResolvedValue([{ id: 'cal-1' }]);
+    const count = jest.fn().mockResolvedValue(1);
+    const prisma = {
+      calibrationRecord: { findMany, count },
+      $transaction: jest.fn(async (operations) => Promise.all(operations)),
+    } as unknown as PrismaService;
+    const service = new CalibrationsService(prisma);
+
+    const result = await service.findAll({
+      page: 1,
+      pageSize: 20,
+      keyword: 'GAS-0001',
+      gasType: GasType.CH4,
+      result: CalibrationResult.NEED_RECHECK,
+      teamId: 'team-1',
+      calibratedById: 'person-1',
+    });
+
+    expect(result).toEqual({ items: [{ id: 'cal-1' }], total: 1, page: 1, pageSize: 20 });
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          deviceId: undefined,
+          gasType: GasType.CH4,
+          result: CalibrationResult.NEED_RECHECK,
+          teamId: 'team-1',
+          calibratedById: 'person-1',
+          OR: [
+            { device: { code: { contains: 'GAS-0001', mode: 'insensitive' } } },
+            { device: { name: { contains: 'GAS-0001', mode: 'insensitive' } } },
+            { calibratedBy: { contains: 'GAS-0001', mode: 'insensitive' } },
+          ],
+        },
+        skip: 0,
+        take: 20,
+        include: expect.any(Object),
+        orderBy: { calibratedAt: 'desc' },
+      }),
+    );
+    expect(count).toHaveBeenCalledWith({
+      where: {
+        deviceId: undefined,
+        gasType: GasType.CH4,
+        result: CalibrationResult.NEED_RECHECK,
+        teamId: 'team-1',
+        calibratedById: 'person-1',
+        OR: [
+          { device: { code: { contains: 'GAS-0001', mode: 'insensitive' } } },
+          { device: { name: { contains: 'GAS-0001', mode: 'insensitive' } } },
+          { calibratedBy: { contains: 'GAS-0001', mode: 'insensitive' } },
+        ],
+      },
+    });
+  });
+
+  it('forwards due status into Prisma where', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-06-30T08:00:00.000Z'));
+    const findMany = jest.fn().mockResolvedValue([]);
+    const count = jest.fn().mockResolvedValue(0);
+    const prisma = {
+      calibrationRecord: { findMany, count },
+      $transaction: jest.fn(async (operations) => Promise.all(operations)),
+    } as unknown as PrismaService;
+    const service = new CalibrationsService(prisma);
+
+    await service.findAll({
+      page: 1,
+      pageSize: 20,
+      dueStatus: CalibrationDueStatus.DUE_SOON,
+    });
+
+    const where = {
+      deviceId: undefined,
+      gasType: undefined,
+      result: CalibrationResult.PASS,
+      teamId: undefined,
+      calibratedById: undefined,
+      nextDueAt: {
+        gte: new Date('2026-06-30T08:00:00.000Z'),
+        lte: new Date('2026-07-07T08:00:00.000Z'),
+      },
+      OR: undefined,
+    };
+    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({ where }));
+    expect(count).toHaveBeenCalledWith({ where });
   });
 });
