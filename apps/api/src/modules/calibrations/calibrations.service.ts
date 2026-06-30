@@ -70,6 +70,64 @@ export class CalibrationsService {
     return paginated(items, total, query);
   }
 
+  async overview(now = new Date()) {
+    const startOfToday = new Date(now);
+    startOfToday.setHours(0, 0, 0, 0);
+    const [totalRecords, todayCompleted, failedRecords, needRecheckRecords, dueItems] = await Promise.all([
+      this.prisma.calibrationRecord.count(),
+      this.prisma.calibrationRecord.count({ where: { calibratedAt: { gte: startOfToday } } }),
+      this.prisma.calibrationRecord.count({ where: { result: CalibrationResult.FAIL } }),
+      this.prisma.calibrationRecord.count({ where: { result: CalibrationResult.NEED_RECHECK } }),
+      this.dueDevices(now),
+    ]);
+
+    return {
+      totalRecords,
+      todayCompleted,
+      dueSoonItems: dueItems.filter((item) => item.dueStatus === CalibrationDueStatus.DUE_SOON).length,
+      overdueItems: dueItems.filter((item) => item.dueStatus === CalibrationDueStatus.OVERDUE).length,
+      failedRecords,
+      needRecheckRecords,
+    };
+  }
+
+  async dueDevices(now = new Date()) {
+    const [devices, records] = await Promise.all([
+      this.prisma.device.findMany({
+        include: { area: true, baseStation: true },
+        orderBy: { code: 'asc' },
+      }),
+      this.prisma.calibrationRecord.findMany({
+        where: { gasType: { in: [...CALIBRATION_GAS_TYPES] } },
+        include: calibrationInclude,
+        orderBy: { calibratedAt: 'desc' },
+      }),
+    ]);
+
+    const latestByDeviceGas = new Map<string, (typeof records)[number]>();
+    for (const record of records) {
+      const key = `${record.deviceId}:${record.gasType}`;
+      if (!latestByDeviceGas.has(key)) latestByDeviceGas.set(key, record);
+    }
+
+    return devices.flatMap((device) =>
+      CALIBRATION_GAS_TYPES.map((gasType) => {
+        const latestCalibration = latestByDeviceGas.get(`${device.id}:${gasType}`) ?? null;
+        return {
+          deviceId: device.id,
+          deviceCode: device.code,
+          deviceName: device.name,
+          gasType,
+          areaName: device.area?.name,
+          baseStationName: device.baseStation?.name,
+          latestCalibration,
+          nextDueAt: latestCalibration?.nextDueAt,
+          dueStatus: this.dueStatusFor(latestCalibration, now),
+        };
+      }),
+    );
+  }
+
   async create(dto: CreateCalibrationDto, userId?: string) {
     const device = await this.prisma.device.findUnique({ where: { id: dto.deviceId } });
     if (!device) throw new NotFoundException('设备不存在');

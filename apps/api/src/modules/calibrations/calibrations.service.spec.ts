@@ -257,4 +257,74 @@ describe('CalibrationsService', () => {
     expect(findMany).toHaveBeenCalledWith(expect.objectContaining({ where }));
     expect(count).toHaveBeenCalledWith({ where });
   });
+
+  it('returns calibration overview counters', async () => {
+    const dueDevices = jest.fn().mockResolvedValue([
+      { dueStatus: 'DUE_SOON' },
+      { dueStatus: 'OVERDUE' },
+      { dueStatus: 'FAILED' },
+    ]);
+    const prisma = {
+      calibrationRecord: {
+        count: jest
+          .fn()
+          .mockResolvedValueOnce(20)
+          .mockResolvedValueOnce(2)
+          .mockResolvedValueOnce(3)
+          .mockResolvedValueOnce(4),
+      },
+    } as unknown as PrismaService;
+    const service = new CalibrationsService(prisma);
+    jest.spyOn(service, 'dueDevices').mockImplementation(dueDevices);
+
+    await expect(service.overview(new Date('2026-06-30T12:00:00.000Z'))).resolves.toEqual({
+      totalRecords: 20,
+      todayCompleted: 2,
+      dueSoonItems: 1,
+      overdueItems: 1,
+      failedRecords: 3,
+      needRecheckRecords: 4,
+    });
+  });
+
+  it('returns due status for each device and calibration gas type', async () => {
+    const now = new Date('2026-06-30T00:00:00.000Z');
+    const prisma = {
+      device: {
+        findMany: jest.fn().mockResolvedValue([
+          { id: 'device-1', code: 'GAS-0001', name: '设备1', area: { name: '一采区' }, baseStation: { name: 'BS-01' } },
+        ]),
+      },
+      calibrationRecord: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'cal-1',
+            deviceId: 'device-1',
+            gasType: GasType.CH4,
+            result: CalibrationResult.PASS,
+            nextDueAt: new Date('2026-07-03T00:00:00.000Z'),
+            calibratedAt: new Date('2026-06-03T00:00:00.000Z'),
+          },
+          {
+            id: 'cal-2',
+            deviceId: 'device-1',
+            gasType: GasType.O2,
+            result: CalibrationResult.FAIL,
+            nextDueAt: new Date('2026-07-30T00:00:00.000Z'),
+            calibratedAt: new Date('2026-06-30T00:00:00.000Z'),
+          },
+        ]),
+      },
+    } as unknown as PrismaService;
+    const service = new CalibrationsService(prisma);
+
+    const result = await service.dueDevices(now);
+
+    expect(result).toEqual([
+      expect.objectContaining({ deviceId: 'device-1', gasType: GasType.CH4, dueStatus: 'DUE_SOON' }),
+      expect.objectContaining({ deviceId: 'device-1', gasType: GasType.O2, dueStatus: 'FAILED' }),
+      expect.objectContaining({ deviceId: 'device-1', gasType: GasType.CO, dueStatus: 'OVERDUE' }),
+      expect.objectContaining({ deviceId: 'device-1', gasType: GasType.H2S, dueStatus: 'OVERDUE' }),
+    ]);
+  });
 });
