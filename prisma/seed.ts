@@ -1,4 +1,4 @@
-import { PrismaClient, AlarmSeverity, DeviceStatus, GasType, RuleOperator, SensorStatus } from '@prisma/client';
+import { PrismaClient, AlarmSeverity, CalibrationResult, DeviceStatus, GasType, RuleOperator, SensorStatus } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
@@ -246,16 +246,77 @@ async function seedAlarmRules() {
   }
 }
 
+async function seedCalibrationRecords() {
+  const devices = await prisma.device.findMany({ take: 8, orderBy: { code: 'asc' } });
+  const personnel = await prisma.personnel.findMany({ take: 4, orderBy: { code: 'asc' } });
+  const teams = await prisma.team.findMany({ take: 2, orderBy: { code: 'asc' } });
+  const gasTypes = [GasType.CH4, GasType.O2, GasType.CO, GasType.H2S];
+  const now = new Date();
+
+  for (const [deviceIndex, device] of devices.entries()) {
+    for (const [gasIndex, gasType] of gasTypes.entries()) {
+      const calibratedAt = new Date(now);
+      calibratedAt.setDate(now.getDate() - ((deviceIndex + gasIndex) % 36));
+      const nextDueAt = new Date(calibratedAt);
+      nextDueAt.setDate(calibratedAt.getDate() + 30);
+      const standardValue = gasType === GasType.O2 ? 20.9 : gasType === GasType.CH4 ? 1 : gasType === GasType.CO ? 24 : 10;
+      const afterValue = deviceIndex % 5 === 0 ? standardValue * 1.24 : deviceIndex % 4 === 0 ? standardValue * 1.14 : standardValue * 1.04;
+      const deviationPercent = Number((Math.abs(afterValue - standardValue) / Math.abs(standardValue) * 100).toFixed(2));
+      const result = deviationPercent > 20
+        ? CalibrationResult.FAIL
+        : deviationPercent > 10
+          ? CalibrationResult.NEED_RECHECK
+          : CalibrationResult.PASS;
+      const person = personnel.length > 0 ? personnel[(deviceIndex + gasIndex) % personnel.length] : undefined;
+      const team = teams.length > 0 ? teams[(deviceIndex + gasIndex) % teams.length] : undefined;
+
+      await prisma.calibrationRecord.upsert({
+        where: { id: `${device.code}-${gasType}-demo` },
+        update: {
+          beforeValue: standardValue * 0.95,
+          afterValue,
+          standardValue,
+          calibratedBy: person?.name ?? '系统示例',
+          calibratedById: person?.id ?? null,
+          teamId: team?.id ?? null,
+          result,
+          deviationPercent,
+          nextDueAt,
+          notes: '种子演示标定记录',
+          calibratedAt,
+        },
+        create: {
+          id: `${device.code}-${gasType}-demo`,
+          deviceId: device.id,
+          gasType,
+          beforeValue: standardValue * 0.95,
+          afterValue,
+          standardValue,
+          calibratedBy: person?.name ?? '系统示例',
+          calibratedById: person?.id ?? null,
+          teamId: team?.id ?? null,
+          result,
+          deviationPercent,
+          nextDueAt,
+          notes: '种子演示标定记录',
+          calibratedAt,
+        },
+      });
+    }
+  }
+}
+
 async function main() {
   await seedRolesAndPermissions();
   const { areas, baseStations } = await seedAreasAndBaseStations();
   await seedDevices(areas, baseStations);
   await seedAlarmRules();
+  await seedCalibrationRecords();
 }
 
 main()
   .then(async () => {
-    console.log('Seed completed: admin user, roles, permissions, areas, base stations, devices, snapshots, alarm rules.');
+    console.log('Seed completed: admin user, roles, permissions, areas, base stations, devices, snapshots, alarm rules, calibration records.');
     await prisma.$disconnect();
   })
   .catch(async (error) => {
