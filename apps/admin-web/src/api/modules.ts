@@ -19,12 +19,20 @@ export function getAlarms(params = {}) {
   return http.get('/alarms', { params });
 }
 
-export function ackAlarm(id: string) {
-  return http.patch(`/alarms/${id}/ack`);
+export function getAlarm(id: string) {
+  return http.get(`/alarms/${id}`);
 }
 
-export function resolveAlarm(id: string) {
-  return http.patch(`/alarms/${id}/resolve`);
+export function getAlarmStatistics() {
+  return http.get('/alarms/statistics');
+}
+
+export function ackAlarm(id: string, data: { remark?: string } = {}) {
+  return http.patch(`/alarms/${id}/ack`, data);
+}
+
+export function resolveAlarm(id: string, data: { remark?: string } = {}) {
+  return http.patch(`/alarms/${id}/resolve`, data);
 }
 
 export function listResource<T>(endpoint: string, params = {}) {

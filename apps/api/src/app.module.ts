@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
+import { ScheduleModule } from '@nestjs/schedule';
 import { HttpExceptionFilter } from './common/http-exception.filter';
 import { ResponseInterceptor } from './common/response.interceptor';
 import { validateEnv } from './config/env.validation';
@@ -30,6 +31,7 @@ import { UsersModule } from './modules/users/users.module';
       envFilePath: ['.env', '.env.local', '../../.env'],
       validate: validateEnv,
     }),
+    ScheduleModule.forRoot(),
     PrismaModule,
     RedisModule,
     HealthModule,

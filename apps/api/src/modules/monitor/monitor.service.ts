@@ -73,15 +73,20 @@ export class MonitorService {
     return areas
       .map((area) => {
         const activeAlarms = area.devices.reduce((sum, device) => sum + device.alarms.length, 0);
+        const escalatedAlarms = area.devices.reduce(
+          (sum, device) => sum + device.alarms.filter((alarm) => alarm.escalationLevel > 0).length,
+          0,
+        );
         const faultDevices = area.devices.filter((device) => device.snapshot?.status === DeviceStatus.FAULT).length;
         const lowBatteryDevices = area.devices.filter((device) => (device.snapshot?.batteryLevel ?? 100) < 20).length;
         return {
           areaId: area.id,
           areaName: area.name,
           activeAlarms,
+          escalatedAlarms,
           faultDevices,
           lowBatteryDevices,
-          riskScore: activeAlarms * 10 + faultDevices * 5 + lowBatteryDevices * 2 + area.riskLevel,
+          riskScore: activeAlarms * 10 + escalatedAlarms * 8 + faultDevices * 5 + lowBatteryDevices * 2 + area.riskLevel,
         };
       })
       .sort((left, right) => right.riskScore - left.riskScore);

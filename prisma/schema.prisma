@@ -250,6 +250,10 @@ model AlarmEvent {
   startedAt      DateTime
   ackedAt        DateTime?
   resolvedAt     DateTime?
+  ackRemark      String?
+  resolveRemark  String?
+  escalatedAt    DateTime?
+  escalationLevel Int             @default(0)
   actions        AlarmActionLog[]
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
@@ -257,6 +261,7 @@ model AlarmEvent {
   @@index([deviceId, status])
   @@index([ruleId, status])
   @@index([status])
+  @@index([status, escalationLevel])
   @@index([startedAt])
   @@index([severity])
 }
