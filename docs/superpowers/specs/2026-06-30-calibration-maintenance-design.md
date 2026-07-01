@@ -259,9 +259,12 @@ GET /devices/:id/calibrations
 
 ## 大屏影响
 
-本轮不改大屏。标定闭环先集中在管理后台、后端接口、设备详情和操作审计，避免把一次迭代拉得过宽。
+区域风险排行纳入已有标定记录的最新状态：
 
-未来如果要把标定风险纳入大屏，可以在区域风险排行中加入 `calibrationFailedItems` 权重；该项不属于本轮交付范围。
+- `calibrationFailedItems`：最新标定结果为 `FAIL` 或 `NEED_RECHECK` 的设备气体项。
+- `calibrationOverdueItems`：最新标定结果为 `PASS` 但 `nextDueAt` 已超期的设备气体项。
+- 风险分增加：标定异常项 `* 6`，标定超期项 `* 3`。
+- 从未标定的设备仍由标定工作台到期清单承接，不在大屏区域风险中放大计分。
 
 ## 操作日志
 

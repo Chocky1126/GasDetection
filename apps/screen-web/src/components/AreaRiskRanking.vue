@@ -5,6 +5,8 @@
       <span>
         {{ item.areaName }}
         <small v-if="item.escalatedAlarms">升级 {{ item.escalatedAlarms }}</small>
+        <small v-if="item.calibrationFailedItems">标定异常 {{ item.calibrationFailedItems }}</small>
+        <small v-if="item.calibrationOverdueItems">标定超期 {{ item.calibrationOverdueItems }}</small>
       </span>
       <strong>{{ item.riskScore }}</strong>
     </div>
