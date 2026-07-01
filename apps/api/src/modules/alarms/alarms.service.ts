@@ -33,6 +33,10 @@ export class AlarmsService {
     return { CH4: 0, O2: 0, CO: 0, H2S: 0, BATTERY: 0 } as Record<GasType, number>;
   }
 
+  private auditDetail(actionText: string, alarmId: string, remark?: string) {
+    return remark ? `${actionText}报警 ${alarmId}：${remark}` : `${actionText}报警 ${alarmId}`;
+  }
+
   async findAll(query: AlarmQueryDto) {
     const where: Prisma.AlarmEventWhereInput = {
       status: query.status,
@@ -102,6 +106,15 @@ export class AlarmsService {
           remark: normalizedRemark,
         },
       });
+      await tx.auditLog.create({
+        data: {
+          userId,
+          module: 'alarms',
+          action: 'ACK',
+          resourceId: id,
+          detail: this.auditDetail('确认', id, normalizedRemark),
+        },
+      });
       return alarm;
     });
   }
@@ -127,6 +140,15 @@ export class AlarmsService {
           userId,
           action: 'RESOLVE',
           remark: normalizedRemark,
+        },
+      });
+      await tx.auditLog.create({
+        data: {
+          userId,
+          module: 'alarms',
+          action: 'RESOLVE',
+          resourceId: id,
+          detail: this.auditDetail('解除', id, normalizedRemark),
         },
       });
       return alarm;

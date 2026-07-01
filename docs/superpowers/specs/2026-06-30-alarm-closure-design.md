@@ -214,12 +214,18 @@ latestAction
 - 无权限：403。
 - 自动升级扫描失败：记录日志，不影响 MQTT 入库和其他报警计算。
 
+## 操作日志
+
+- 确认报警写入 `AuditLog`：`module = alarms`，`action = ACK`。
+- 解除报警写入 `AuditLog`：`module = alarms`，`action = RESOLVE`。
+- 操作日志支持按 `module`、`action` 和关键词筛选，便于追踪报警处置和标定异常。
+
 ## 测试和验证
 
 后端单测：
 
-- 确认报警写入 `ackRemark` 和 `ACK` 动作日志。
-- 解除报警写入 `resolveRemark` 和 `RESOLVE` 动作日志。
+- 确认报警写入 `ackRemark`、`ACK` 动作日志和操作日志。
+- 解除报警写入 `resolveRemark`、`RESOLVE` 动作日志和操作日志。
 - 已解除报警不能再次确认。
 - ACTIVE 超时报警自动升级并写入 `ESCALATE` 日志。
 - 统计接口按状态、等级、气体类型返回聚合结果。
