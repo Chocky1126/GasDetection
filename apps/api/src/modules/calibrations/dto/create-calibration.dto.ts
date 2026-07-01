@@ -21,11 +21,17 @@ export class CreateCalibrationDto {
   @IsNumber()
   standardValue!: number;
 
+  @IsOptional()
   @IsString()
-  calibratedBy!: string;
+  calibratedById?: string;
 
+  @IsOptional()
   @IsString()
-  result!: string;
+  teamId?: string;
+
+  @IsOptional()
+  @IsString()
+  calibratedBy?: string;
 
   @IsOptional()
   @IsString()

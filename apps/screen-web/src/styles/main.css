@@ -105,6 +105,11 @@ p {
   border-bottom: 1px solid rgba(125, 211, 252, 0.12);
 }
 
+.alarm-row.escalated {
+  border-left: 3px solid #ff4d4f;
+  padding-left: 10px;
+}
+
 .alarm-row span {
   color: #cde7ff;
   font-size: 13px;
@@ -172,8 +177,20 @@ p {
 .rank-row {
   display: flex;
   justify-content: space-between;
+  gap: 12px;
   padding: 10px 0;
   border-bottom: 1px solid rgba(125, 211, 252, 0.12);
+}
+
+.rank-row span {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.rank-row small {
+  color: #fb7185;
+  font-size: 12px;
 }
 
 .rank-row strong {

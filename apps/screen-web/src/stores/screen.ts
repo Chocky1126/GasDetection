@@ -13,6 +13,21 @@ export const useScreenStore = defineStore('screen', () => {
   const connected = ref(false);
   let socket: Socket | null = null;
 
+  function applyScreenMetrics(payload: any) {
+    if (payload?.overview) {
+      overview.value = payload.overview;
+    }
+    if (Array.isArray(payload?.trends)) {
+      trends.value = payload.trends;
+    }
+    if (Array.isArray(payload?.statusDistribution)) {
+      statusDistribution.value = payload.statusDistribution;
+    }
+    if (Array.isArray(payload?.areaRiskRanking)) {
+      areaRiskRanking.value = payload.areaRiskRanking;
+    }
+  }
+
   async function bootstrap() {
     await screenLogin();
     await refresh();
@@ -58,6 +73,9 @@ export const useScreenStore = defineStore('screen', () => {
     });
     socket.on('screen.overview.updated', (payload) => {
       overview.value = payload;
+    });
+    socket.on('screen.metrics.updated', (payload) => {
+      applyScreenMetrics(payload);
     });
   }
 

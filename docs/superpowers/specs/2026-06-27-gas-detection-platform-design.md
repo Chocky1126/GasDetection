@@ -275,6 +275,7 @@ alarm.created
 alarm.updated
 device.status.changed
 screen.overview.updated
+screen.metrics.updated
 ```
 
 客户端订阅消息：

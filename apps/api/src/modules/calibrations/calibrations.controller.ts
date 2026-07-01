@@ -1,10 +1,12 @@
 import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Permissions } from '../../common/decorators/permissions.decorator';
-import { ListQueryDto } from '../../common/dto/list-query.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { AuthenticatedUser } from '../auth/auth.types';
 import { CalibrationsService } from './calibrations.service';
+import { CalibrationQueryDto } from './dto/calibration-query.dto';
 import { CreateCalibrationDto } from './dto/create-calibration.dto';
 
 @ApiTags('calibrations')
@@ -16,13 +18,25 @@ export class CalibrationsController {
 
   @Get()
   @Permissions('calibrations:read')
-  findAll(@Query() query: ListQueryDto) {
+  findAll(@Query() query: CalibrationQueryDto) {
     return this.calibrationsService.findAll(query);
+  }
+
+  @Get('overview')
+  @Permissions('calibrations:read')
+  overview() {
+    return this.calibrationsService.overview();
+  }
+
+  @Get('due-devices')
+  @Permissions('calibrations:read')
+  dueDevices() {
+    return this.calibrationsService.dueDevices();
   }
 
   @Post()
   @Permissions('calibrations:write')
-  create(@Body() dto: CreateCalibrationDto) {
-    return this.calibrationsService.create(dto);
+  create(@Body() dto: CreateCalibrationDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.calibrationsService.create(dto, user?.id);
   }
 }
