@@ -25,16 +25,51 @@ export class AreasService {
     return paginated(items, total, query);
   }
 
-  create(dto: CreateAreaDto) {
-    return this.prisma.area.create({ data: { ...dto, riskLevel: dto.riskLevel ?? 1 } });
+  create(dto: CreateAreaDto, userId?: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const area = await tx.area.create({ data: { ...dto, riskLevel: dto.riskLevel ?? 1 } });
+      await tx.auditLog.create({
+        data: {
+          userId,
+          module: 'areas',
+          action: 'CREATE',
+          resourceId: area.id,
+          detail: `新增区域 ${area.code} ${area.name}`,
+        },
+      });
+      return area;
+    });
   }
 
-  update(id: string, dto: UpdateAreaDto) {
-    return this.prisma.area.update({ where: { id }, data: dto });
+  update(id: string, dto: UpdateAreaDto, userId?: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const area = await tx.area.update({ where: { id }, data: dto });
+      await tx.auditLog.create({
+        data: {
+          userId,
+          module: 'areas',
+          action: 'UPDATE',
+          resourceId: area.id,
+          detail: `更新区域 ${area.code} ${area.name}`,
+        },
+      });
+      return area;
+    });
   }
 
-  async remove(id: string) {
-    await this.prisma.area.delete({ where: { id } });
-    return { id };
+  remove(id: string, userId?: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const area = await tx.area.delete({ where: { id } });
+      await tx.auditLog.create({
+        data: {
+          userId,
+          module: 'areas',
+          action: 'DELETE',
+          resourceId: area.id,
+          detail: `删除区域 ${area.code} ${area.name}`,
+        },
+      });
+      return { id: area.id };
+    });
   }
 }
