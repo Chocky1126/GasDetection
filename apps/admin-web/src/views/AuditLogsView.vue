@@ -90,6 +90,7 @@ const moduleOptions = [
 const actionOptions = [
   { label: '确认报警', value: 'ACK' },
   { label: '解除报警', value: 'RESOLVE' },
+  { label: '自动升级', value: 'ESCALATE' },
   { label: '新增', value: 'CREATE' },
   { label: '标定告警', value: 'CALIBRATION_WARNING' },
   { label: '更新', value: 'UPDATE' },
@@ -152,6 +153,7 @@ function actionText(action: string) {
     {
       ACK: '确认报警',
       RESOLVE: '解除报警',
+      ESCALATE: '自动升级',
       CREATE: '新增',
       CALIBRATION_WARNING: '标定告警',
       UPDATE: '更新',
@@ -165,6 +167,7 @@ function actionType(action: string) {
     {
       ACK: 'warning',
       RESOLVE: 'success',
+      ESCALATE: 'danger',
       CREATE: 'primary',
       CALIBRATION_WARNING: 'danger',
       UPDATE: 'info',

@@ -5,7 +5,7 @@ import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { AlarmEscalationService } from './alarm-escalation.service';
 
 describe('AlarmEscalationService', () => {
-  it('escalates overdue active alarms, records action logs, and emits realtime updates', async () => {
+  it('escalates overdue active alarms, records action and audit logs, and emits realtime updates', async () => {
     const now = new Date('2026-06-30T10:00:00.000Z');
     const overdueAlarm = {
       id: 'alarm-1',
@@ -31,6 +31,9 @@ describe('AlarmEscalationService', () => {
       },
       alarmActionLog: {
         create: jest.fn().mockResolvedValue({ id: 'action-1' }),
+      },
+      auditLog: {
+        create: jest.fn().mockResolvedValue({ id: 'audit-1' }),
       },
     };
     const transaction = jest.fn(async (callback) => callback(tx));
@@ -73,6 +76,14 @@ describe('AlarmEscalationService', () => {
         alarmId: 'alarm-1',
         action: 'ESCALATE',
         remark: '报警超过 60 秒未确认，自动升级',
+      },
+    });
+    expect(tx.auditLog.create).toHaveBeenCalledWith({
+      data: {
+        module: 'alarms',
+        action: 'ESCALATE',
+        resourceId: 'alarm-1',
+        detail: '报警 alarm-1 超过 60 秒未确认，自动升级',
       },
     });
     expect(tx.alarmEvent.findUnique).toHaveBeenCalledWith({
@@ -160,6 +171,9 @@ describe('AlarmEscalationService', () => {
       alarmActionLog: {
         create: jest.fn(),
       },
+      auditLog: {
+        create: jest.fn(),
+      },
     };
     const prisma = {
       alarmEvent: {
@@ -179,6 +193,7 @@ describe('AlarmEscalationService', () => {
 
     expect(result).toEqual({ scanned: 1, escalated: 0 });
     expect(tx.alarmActionLog.create).not.toHaveBeenCalled();
+    expect(tx.auditLog.create).not.toHaveBeenCalled();
     expect(tx.alarmEvent.findUnique).not.toHaveBeenCalled();
     expect(gateway.emitAlarmUpdated).not.toHaveBeenCalled();
     expect(monitorService.getScreenMetrics).not.toHaveBeenCalled();

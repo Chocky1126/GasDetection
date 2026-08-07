@@ -64,6 +64,14 @@ export class AlarmEscalationService {
             remark: `报警超过 ${deadlineSeconds} 秒未确认，自动升级`,
           },
         });
+        await tx.auditLog.create({
+          data: {
+            module: 'alarms',
+            action: 'ESCALATE',
+            resourceId: alarm.id,
+            detail: `报警 ${alarm.id} 超过 ${deadlineSeconds} 秒未确认，自动升级`,
+          },
+        });
         return tx.alarmEvent.findUnique({
           where: { id: alarm.id },
           include: {
