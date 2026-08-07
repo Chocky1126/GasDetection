@@ -7,7 +7,12 @@ import { RedisService } from '../redis/redis.service';
 import { TelemetryIngestionService } from './telemetry-ingestion.service';
 
 describe('TelemetryIngestionService', () => {
-  it('emits a complete screen metrics payload after telemetry changes live state', async () => {
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('coalesces a telemetry burst into one complete screen metrics refresh', async () => {
+    jest.useFakeTimers();
     const reportedAt = '2026-06-30T10:00:00.000Z';
     const device = {
       id: 'device-1',
@@ -54,7 +59,7 @@ describe('TelemetryIngestionService', () => {
     } as unknown as MonitorService;
     const service = new TelemetryIngestionService(prisma, redis, alarmEvaluator, realtimeGateway, monitorService);
 
-    await service.handleTelemetry({
+    const payload = {
       deviceCode: device.code,
       ch4: 0.3,
       o2: 20.8,
@@ -67,9 +72,14 @@ describe('TelemetryIngestionService', () => {
       onlineStatus: DeviceStatus.ONLINE,
       sensorStatus: SensorStatus.NORMAL,
       reportedAt,
-    });
+    };
 
-    expect(monitorService.getScreenMetrics).toHaveBeenCalled();
+    await Promise.all([service.handleTelemetry(payload), service.handleTelemetry(payload)]);
+
+    expect(monitorService.getScreenMetrics).not.toHaveBeenCalled();
+    await jest.advanceTimersByTimeAsync(1_000);
+
+    expect(monitorService.getScreenMetrics).toHaveBeenCalledTimes(1);
     expect((realtimeGateway as any).emitScreenMetricsUpdated).toHaveBeenCalledWith(metrics);
   });
 });

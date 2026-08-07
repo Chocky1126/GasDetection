@@ -53,7 +53,11 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
     }
 
     if (topic.endsWith('/telemetry')) {
-      await this.telemetryIngestion.handleTelemetry(payload as never);
+      try {
+        await this.telemetryIngestion.handleTelemetry(payload as never);
+      } catch (error) {
+        this.logger.error(`Telemetry processing failed on ${topic}: ${(error as Error).message}`);
+      }
     }
   }
 }
