@@ -6,7 +6,7 @@
         <el-input
           v-model="keyword"
           clearable
-          placeholder="输入编号或名称"
+          :placeholder="searchPlaceholder"
           style="width: 240px"
           @keyup.enter="search"
           @clear="search"
@@ -135,6 +135,7 @@ const props = withDefaults(
   defineProps<{
     title: string;
     endpoint: string;
+    searchPlaceholder?: string;
     columns: ResourceColumn[];
     fields: ResourceField[];
     initialValues?: Record<string, unknown>;
@@ -143,6 +144,7 @@ const props = withDefaults(
   }>(),
   {
     initialValues: () => ({}),
+    searchPlaceholder: '输入编号或名称',
     toForm: undefined,
     toPayload: undefined,
   },

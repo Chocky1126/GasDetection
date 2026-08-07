@@ -83,6 +83,10 @@ const moduleOptions = [
   { label: '报警中心', value: 'alarms' },
   { label: '标定记录', value: 'calibrations' },
   { label: '设备管理', value: 'devices' },
+  { label: '人员管理', value: 'personnel' },
+  { label: '班组管理', value: 'teams' },
+  { label: '区域管理', value: 'areas' },
+  { label: '基站管理', value: 'base-stations' },
   { label: '用户管理', value: 'users' },
   { label: '角色管理', value: 'roles' },
 ];
@@ -142,6 +146,10 @@ function moduleText(module: string) {
       alarms: '报警中心',
       calibrations: '标定记录',
       devices: '设备管理',
+      personnel: '人员管理',
+      teams: '班组管理',
+      areas: '区域管理',
+      'base-stations': '基站管理',
       users: '用户管理',
       roles: '角色管理',
     } as Record<string, string>
