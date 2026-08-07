@@ -25,32 +25,46 @@ export class PersonnelService {
     return paginated(items, total, query);
   }
 
-  create(dto: CreatePersonnelDto) {
-    return this.prisma.personnel.create({
-      data: {
-        code: dto.code,
-        name: dto.name,
-        phone: dto.phone,
-        position: dto.position,
-        teams: {
-          create: dto.teamIds?.map((teamId) => ({ teamId })) ?? [],
+  create(dto: CreatePersonnelDto, userId?: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const person = await tx.personnel.create({
+        data: {
+          code: dto.code,
+          name: dto.name,
+          phone: dto.phone,
+          position: dto.position,
+          teams: {
+            create: dto.teamIds?.map((teamId) => ({ teamId })) ?? [],
+          },
         },
-      },
-      include: { teams: { include: { team: true } } },
+        include: { teams: { include: { team: true } } },
+      });
+      await tx.auditLog.create({
+        data: {
+          userId,
+          module: 'personnel',
+          action: 'CREATE',
+          resourceId: person.id,
+          detail: `新增人员 ${person.code} ${person.name}`,
+        },
+      });
+      return person;
     });
   }
 
-  async update(id: string, dto: UpdatePersonnelDto) {
+  async update(id: string, dto: UpdatePersonnelDto, userId?: string) {
     return this.prisma.$transaction(async (tx) => {
-      if (dto.teamIds) {
+      if (dto.teamIds !== undefined) {
         await tx.personnelTeam.deleteMany({ where: { personnelId: id } });
-        await tx.personnelTeam.createMany({
-          data: dto.teamIds.map((teamId) => ({ personnelId: id, teamId })),
-          skipDuplicates: true,
-        });
+        if (dto.teamIds.length > 0) {
+          await tx.personnelTeam.createMany({
+            data: dto.teamIds.map((teamId) => ({ personnelId: id, teamId })),
+            skipDuplicates: true,
+          });
+        }
       }
 
-      return tx.personnel.update({
+      const person = await tx.personnel.update({
         where: { id },
         data: {
           code: dto.code,
@@ -60,11 +74,32 @@ export class PersonnelService {
         },
         include: { teams: { include: { team: true } } },
       });
+      await tx.auditLog.create({
+        data: {
+          userId,
+          module: 'personnel',
+          action: 'UPDATE',
+          resourceId: person.id,
+          detail: `更新人员 ${person.code} ${person.name}`,
+        },
+      });
+      return person;
     });
   }
 
-  async remove(id: string) {
-    await this.prisma.personnel.delete({ where: { id } });
-    return { id };
+  remove(id: string, userId?: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const person = await tx.personnel.delete({ where: { id } });
+      await tx.auditLog.create({
+        data: {
+          userId,
+          module: 'personnel',
+          action: 'DELETE',
+          resourceId: person.id,
+          detail: `删除人员 ${person.code} ${person.name}`,
+        },
+      });
+      return { id: person.id };
+    });
   }
 }
