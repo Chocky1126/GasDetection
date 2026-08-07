@@ -26,6 +26,12 @@ enum GasType {
   BATTERY
 }
 
+enum CalibrationResult {
+  PASS
+  NEED_RECHECK
+  FAIL
+}
+
 enum AlarmSeverity {
   LOW
   MEDIUM
@@ -250,6 +256,10 @@ model AlarmEvent {
   startedAt      DateTime
   ackedAt        DateTime?
   resolvedAt     DateTime?
+  ackRemark      String?
+  resolveRemark  String?
+  escalatedAt    DateTime?
+  escalationLevel Int             @default(0)
   actions        AlarmActionLog[]
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
@@ -257,6 +267,7 @@ model AlarmEvent {
   @@index([deviceId, status])
   @@index([ruleId, status])
   @@index([status])
+  @@index([status, escalationLevel])
   @@index([startedAt])
   @@index([severity])
 }
@@ -276,24 +287,26 @@ model AlarmActionLog {
 }
 
 model Team {
-  id          String          @id @default(cuid())
-  code        String          @unique
-  name        String
-  description String?
-  members     PersonnelTeam[]
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  id           String              @id @default(cuid())
+  code         String              @unique
+  name         String
+  description  String?
+  members      PersonnelTeam[]
+  calibrations CalibrationRecord[]
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
 }
 
 model Personnel {
-  id        String          @id @default(cuid())
-  code      String          @unique
-  name      String
-  phone     String?
-  position  String?
-  teams     PersonnelTeam[]
-  createdAt DateTime        @default(now())
-  updatedAt DateTime        @updatedAt
+  id           String              @id @default(cuid())
+  code         String              @unique
+  name         String
+  phone        String?
+  position     String?
+  teams        PersonnelTeam[]
+  calibrations CalibrationRecord[]
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
 }
 
 model PersonnelTeam {
@@ -307,21 +320,31 @@ model PersonnelTeam {
 }
 
 model CalibrationRecord {
-  id            String   @id @default(cuid())
-  deviceId      String
-  device        Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
-  gasType       GasType
-  beforeValue   Float
-  afterValue    Float
-  standardValue Float
-  calibratedBy  String
-  result        String
-  notes         String?
-  calibratedAt  DateTime
-  createdAt     DateTime @default(now())
+  id               String            @id @default(cuid())
+  deviceId         String
+  device           Device            @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  gasType          GasType
+  beforeValue      Float
+  afterValue       Float
+  standardValue    Float
+  calibratedBy     String
+  calibratedById   String?
+  calibratedByUser Personnel?        @relation(fields: [calibratedById], references: [id], onDelete: SetNull)
+  teamId           String?
+  team             Team?             @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  result           CalibrationResult @default(PASS)
+  deviationPercent Float             @default(0)
+  nextDueAt        DateTime          @default(now())
+  notes            String?
+  calibratedAt     DateTime
+  createdAt        DateTime          @default(now())
 
   @@index([deviceId, calibratedAt])
   @@index([gasType])
+  @@index([result])
+  @@index([nextDueAt])
+  @@index([teamId])
+  @@index([calibratedById])
 }
 
 model AuditLog {

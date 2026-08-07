@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { DeviceStatus } from '@prisma/client';
 import { AlarmEvaluatorService } from '../alarms/alarm-evaluator.service';
 import { MonitorService } from '../monitor/monitor.service';
@@ -8,8 +8,11 @@ import { RedisService } from '../redis/redis.service';
 import { TelemetryPayload } from './telemetry-payload';
 
 @Injectable()
-export class TelemetryIngestionService {
+export class TelemetryIngestionService implements OnModuleDestroy {
   private readonly logger = new Logger(TelemetryIngestionService.name);
+  private screenMetricsRefreshTimer?: ReturnType<typeof setTimeout>;
+  private screenMetricsRefresh?: Promise<void>;
+  private screenMetricsRefreshQueued = false;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -100,8 +103,31 @@ export class TelemetryIngestionService {
     for (const alarm of alarmChanges.resolved) {
       this.realtimeGateway.emitAlarmUpdated(alarm);
     }
-    this.realtimeGateway.emitScreenOverviewUpdated(await this.monitorService.getOverview());
+    this.scheduleScreenMetricsRefresh();
 
     return { telemetry, snapshot, alarmChanges };
+  }
+
+  onModuleDestroy() {
+    if (this.screenMetricsRefreshTimer) clearTimeout(this.screenMetricsRefreshTimer);
+  }
+
+  private scheduleScreenMetricsRefresh() {
+    this.screenMetricsRefreshQueued = true;
+    if (this.screenMetricsRefreshTimer || this.screenMetricsRefresh) return;
+
+    this.screenMetricsRefreshTimer = setTimeout(() => {
+      this.screenMetricsRefreshTimer = undefined;
+      this.screenMetricsRefreshQueued = false;
+      this.screenMetricsRefresh = this.monitorService
+        .getScreenMetrics()
+        .then((metrics) => this.realtimeGateway.emitScreenMetricsUpdated(metrics))
+        .catch((error: Error) => this.logger.error(`Screen metrics refresh failed: ${error.message}`))
+        .finally(() => {
+          this.screenMetricsRefresh = undefined;
+          if (this.screenMetricsRefreshQueued) this.scheduleScreenMetricsRefresh();
+        });
+    }, 1_000);
+    this.screenMetricsRefreshTimer.unref();
   }
 }

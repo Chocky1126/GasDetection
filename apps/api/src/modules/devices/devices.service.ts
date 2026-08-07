@@ -3,6 +3,7 @@ import { DeviceStatus, Prisma, SensorStatus } from '@prisma/client';
 import { ListQueryDto, paginated, pagination } from '../../common/dto/list-query.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateDeviceDto } from './dto/create-device.dto';
+import { DeviceCalibrationQueryDto } from './dto/device-calibration-query.dto';
 import { DeviceQueryDto } from './dto/device-query.dto';
 import { UpdateDeviceDto } from './dto/update-device.dto';
 
@@ -131,6 +132,23 @@ export class DevicesService {
         include: { rule: true },
       }),
       this.prisma.alarmEvent.count({ where: { deviceId: id } }),
+    ]);
+    return paginated(items, total, query);
+  }
+
+  async findCalibrations(id: string, query: DeviceCalibrationQueryDto) {
+    const where: Prisma.CalibrationRecordWhereInput = {
+      deviceId: id,
+      gasType: query.gasType,
+    };
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.calibrationRecord.findMany({
+        where,
+        ...pagination(query),
+        orderBy: { calibratedAt: 'desc' },
+        include: { calibratedByUser: true, team: true },
+      }),
+      this.prisma.calibrationRecord.count({ where }),
     ]);
     return paginated(items, total, query);
   }

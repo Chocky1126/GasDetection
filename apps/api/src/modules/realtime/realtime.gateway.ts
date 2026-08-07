@@ -64,4 +64,11 @@ export class RealtimeGateway {
   emitScreenOverviewUpdated(payload: unknown) {
     this.server?.emit(RealtimeEvents.ScreenOverviewUpdated, payload);
   }
+
+  emitScreenMetricsUpdated(payload: { overview?: unknown }) {
+    this.server?.emit(RealtimeEvents.ScreenMetricsUpdated, payload);
+    if (payload.overview) {
+      this.emitScreenOverviewUpdated(payload.overview);
+    }
+  }
 }

@@ -139,6 +139,7 @@ ACTIVE -> RESOLVED
   - `escalatedAt = now`
   - severity 至少提升一级，最高到 `CRITICAL`
   - 写入 `AlarmActionLog(action = "ESCALATE")`
+  - 写入系统 `AuditLog(module = "alarms", action = "ESCALATE")`
   - 通过 WebSocket 推送 `alarm.updated`
 
 说明：
@@ -175,7 +176,7 @@ ACTIVE -> RESOLVED
 
 - 实时报警列表展示升级标记。
 - 区域风险排行计算时，升级报警权重高于普通 ACTIVE 报警。
-- 收到 `alarm.updated` 和 `screen.overview.updated` 后刷新大屏数据。
+- 收到 `alarm.updated`、`screen.overview.updated` 和 `screen.metrics.updated` 后刷新大屏数据。
 
 ## WebSocket
 
@@ -185,6 +186,7 @@ ACTIVE -> RESOLVED
 alarm.created
 alarm.updated
 screen.overview.updated
+screen.metrics.updated
 ```
 
 `alarm.updated` 负载需要包含：
@@ -213,14 +215,21 @@ latestAction
 - 无权限：403。
 - 自动升级扫描失败：记录日志，不影响 MQTT 入库和其他报警计算。
 
+## 操作日志
+
+- 确认报警写入 `AuditLog`：`module = alarms`，`action = ACK`。
+- 解除报警写入 `AuditLog`：`module = alarms`，`action = RESOLVE`。
+- 自动升级写入无用户关联的系统 `AuditLog`：`module = alarms`，`action = ESCALATE`。
+- 操作日志支持按 `module`、`action` 和关键词筛选，便于追踪报警处置和标定异常。
+
 ## 测试和验证
 
 后端单测：
 
-- 确认报警写入 `ackRemark` 和 `ACK` 动作日志。
-- 解除报警写入 `resolveRemark` 和 `RESOLVE` 动作日志。
+- 确认报警写入 `ackRemark`、`ACK` 动作日志和操作日志。
+- 解除报警写入 `resolveRemark`、`RESOLVE` 动作日志和操作日志。
 - 已解除报警不能再次确认。
-- ACTIVE 超时报警自动升级并写入 `ESCALATE` 日志。
+- ACTIVE 超时报警自动升级，并在同一事务写入 `ESCALATE` 动作日志和操作日志。
 - 统计接口按状态、等级、气体类型返回聚合结果。
 
 前端验证：

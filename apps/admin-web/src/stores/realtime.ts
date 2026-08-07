@@ -25,6 +25,9 @@ export const useRealtimeStore = defineStore('realtime', () => {
     socket.on('alarm.created', (payload) => {
       latestAlarm.value = payload;
     });
+    socket.on('alarm.updated', (payload) => {
+      latestAlarm.value = payload;
+    });
     socket.on('screen.overview.updated', (payload) => {
       overview.value = payload;
     });

@@ -1,4 +1,4 @@
-import { PrismaClient, AlarmSeverity, DeviceStatus, GasType, RuleOperator, SensorStatus } from '@prisma/client';
+import { PrismaClient, AlarmSeverity, CalibrationResult, DeviceStatus, GasType, RuleOperator, SensorStatus } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
@@ -28,6 +28,23 @@ const alarmRules = [
   { name: '氧气低限报警', gasType: GasType.O2, operator: RuleOperator.LTE, thresholdValue: 19.5, severity: AlarmSeverity.HIGH },
   { name: '一氧化碳报警', gasType: GasType.CO, operator: RuleOperator.GTE, thresholdValue: 24, severity: AlarmSeverity.MEDIUM },
   { name: '硫化氢报警', gasType: GasType.H2S, operator: RuleOperator.GTE, thresholdValue: 10, severity: AlarmSeverity.MEDIUM },
+] as const;
+const calibrationGasTypes = [GasType.CH4, GasType.O2, GasType.CO, GasType.H2S] as const;
+const calibrationStandardValues: Record<(typeof calibrationGasTypes)[number], number> = {
+  [GasType.CH4]: 1,
+  [GasType.O2]: 20.9,
+  [GasType.CO]: 24,
+  [GasType.H2S]: 10,
+};
+const calibrationTeams = [
+  { code: 'CAL-TEAM-A', name: '标定一班', description: '井下气体检测仪标定一班' },
+  { code: 'CAL-TEAM-B', name: '标定二班', description: '井下气体检测仪标定二班' },
+] as const;
+const calibrationPersonnel = [
+  { code: 'CAL-P001', name: '李建国', phone: '13800001001', position: '标定工程师', teamCode: 'CAL-TEAM-A' },
+  { code: 'CAL-P002', name: '王敏', phone: '13800001002', position: '安全监测员', teamCode: 'CAL-TEAM-A' },
+  { code: 'CAL-P003', name: '张强', phone: '13800001003', position: '仪表维护员', teamCode: 'CAL-TEAM-B' },
+  { code: 'CAL-P004', name: '赵磊', phone: '13800001004', position: '标定复核员', teamCode: 'CAL-TEAM-B' },
 ] as const;
 
 function deviceCode(index: number): string {
@@ -246,16 +263,139 @@ async function seedAlarmRules() {
   }
 }
 
+async function seedTeamsAndPersonnel() {
+  const teamsByCode = new Map<string, { id: string; code: string }>();
+  for (const teamData of calibrationTeams) {
+    const team = await prisma.team.upsert({
+      where: { code: teamData.code },
+      update: {
+        name: teamData.name,
+        description: teamData.description,
+      },
+      create: teamData,
+    });
+    teamsByCode.set(team.code, team);
+  }
+
+  const seededPersonnel: Array<{ id: string; teamCode: string }> = [];
+  for (const personData of calibrationPersonnel) {
+    const person = await prisma.personnel.upsert({
+      where: { code: personData.code },
+      update: {
+        name: personData.name,
+        phone: personData.phone,
+        position: personData.position,
+      },
+      create: {
+        code: personData.code,
+        name: personData.name,
+        phone: personData.phone,
+        position: personData.position,
+      },
+    });
+    seededPersonnel.push({ id: person.id, teamCode: personData.teamCode });
+  }
+
+  for (const person of seededPersonnel) {
+    const team = teamsByCode.get(person.teamCode);
+    if (!team) {
+      continue;
+    }
+
+    await prisma.personnelTeam.upsert({
+      where: { personnelId_teamId: { personnelId: person.id, teamId: team.id } },
+      update: {},
+      create: { personnelId: person.id, teamId: team.id },
+    });
+  }
+}
+
+async function seedCalibrationRecords() {
+  const devices = await prisma.device.findMany({ take: 8, orderBy: { code: 'asc' } });
+  const personnel = await prisma.personnel.findMany({
+    where: { code: { in: calibrationPersonnel.map((person) => person.code) } },
+    take: 4,
+    orderBy: { code: 'asc' },
+  });
+  const teams = await prisma.team.findMany({
+    where: { code: { in: calibrationTeams.map((team) => team.code) } },
+    take: 2,
+    orderBy: { code: 'asc' },
+  });
+  const teamCodeByPersonnelCode = new Map(calibrationPersonnel.map((person) => [person.code, person.teamCode]));
+  const now = new Date();
+
+  for (const [deviceIndex, device] of devices.entries()) {
+    for (const [gasIndex, gasType] of calibrationGasTypes.entries()) {
+      const calibratedAt = new Date(now);
+      calibratedAt.setDate(now.getDate() - ((deviceIndex + gasIndex) % 36));
+      const nextDueAt = new Date(calibratedAt);
+      nextDueAt.setDate(calibratedAt.getDate() + 30);
+      const standardValue = calibrationStandardValues[gasType];
+      const driftIndex = deviceIndex + gasIndex;
+      const afterValue = driftIndex % 5 === 0 ? standardValue * 1.24 : driftIndex % 4 === 0 ? standardValue * 1.14 : standardValue * 1.04;
+      const deviationPercent = Number((Math.abs(afterValue - standardValue) / Math.abs(standardValue) * 100).toFixed(2));
+      const result = deviationPercent > 20
+        ? CalibrationResult.FAIL
+        : deviationPercent > 10
+          ? CalibrationResult.NEED_RECHECK
+          : CalibrationResult.PASS;
+      const person = personnel.length > 0 ? personnel[(deviceIndex + gasIndex) % personnel.length] : undefined;
+      const teamCode = person ? teamCodeByPersonnelCode.get(person.code) : undefined;
+      const team = teamCode
+        ? teams.find((candidate) => candidate.code === teamCode)
+        : teams.length > 0
+          ? teams[(deviceIndex + gasIndex) % teams.length]
+          : undefined;
+
+      await prisma.calibrationRecord.upsert({
+        where: { id: `${device.code}-${gasType}-demo` },
+        update: {
+          beforeValue: standardValue * 0.95,
+          afterValue,
+          standardValue,
+          calibratedBy: person?.name ?? '系统示例',
+          calibratedById: person?.id ?? null,
+          teamId: team?.id ?? null,
+          result,
+          deviationPercent,
+          nextDueAt,
+          notes: '种子演示标定记录',
+          calibratedAt,
+        },
+        create: {
+          id: `${device.code}-${gasType}-demo`,
+          deviceId: device.id,
+          gasType,
+          beforeValue: standardValue * 0.95,
+          afterValue,
+          standardValue,
+          calibratedBy: person?.name ?? '系统示例',
+          calibratedById: person?.id ?? null,
+          teamId: team?.id ?? null,
+          result,
+          deviationPercent,
+          nextDueAt,
+          notes: '种子演示标定记录',
+          calibratedAt,
+        },
+      });
+    }
+  }
+}
+
 async function main() {
   await seedRolesAndPermissions();
   const { areas, baseStations } = await seedAreasAndBaseStations();
   await seedDevices(areas, baseStations);
   await seedAlarmRules();
+  await seedTeamsAndPersonnel();
+  await seedCalibrationRecords();
 }
 
 main()
   .then(async () => {
-    console.log('Seed completed: admin user, roles, permissions, areas, base stations, devices, snapshots, alarm rules.');
+    console.log('Seed completed: admin user, roles, permissions, areas, base stations, devices, snapshots, alarm rules, teams, personnel, calibration records.');
     await prisma.$disconnect();
   })
   .catch(async (error) => {

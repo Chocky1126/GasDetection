@@ -20,16 +20,51 @@ export class TeamsService {
     return paginated(items, total, query);
   }
 
-  create(dto: CreateTeamDto) {
-    return this.prisma.team.create({ data: dto });
+  create(dto: CreateTeamDto, userId?: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const team = await tx.team.create({ data: dto });
+      await tx.auditLog.create({
+        data: {
+          userId,
+          module: 'teams',
+          action: 'CREATE',
+          resourceId: team.id,
+          detail: `新增班组 ${team.code} ${team.name}`,
+        },
+      });
+      return team;
+    });
   }
 
-  update(id: string, dto: UpdateTeamDto) {
-    return this.prisma.team.update({ where: { id }, data: dto });
+  update(id: string, dto: UpdateTeamDto, userId?: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const team = await tx.team.update({ where: { id }, data: dto });
+      await tx.auditLog.create({
+        data: {
+          userId,
+          module: 'teams',
+          action: 'UPDATE',
+          resourceId: team.id,
+          detail: `更新班组 ${team.code} ${team.name}`,
+        },
+      });
+      return team;
+    });
   }
 
-  async remove(id: string) {
-    await this.prisma.team.delete({ where: { id } });
-    return { id };
+  remove(id: string, userId?: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const team = await tx.team.delete({ where: { id } });
+      await tx.auditLog.create({
+        data: {
+          userId,
+          module: 'teams',
+          action: 'DELETE',
+          resourceId: team.id,
+          detail: `删除班组 ${team.code} ${team.name}`,
+        },
+      });
+      return { id: team.id };
+    });
   }
 }

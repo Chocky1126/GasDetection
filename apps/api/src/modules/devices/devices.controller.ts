@@ -5,6 +5,7 @@ import { Permissions } from '../../common/decorators/permissions.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { CreateDeviceDto } from './dto/create-device.dto';
+import { DeviceCalibrationQueryDto } from './dto/device-calibration-query.dto';
 import { DeviceQueryDto } from './dto/device-query.dto';
 import { UpdateDeviceDto } from './dto/update-device.dto';
 import { DevicesService } from './devices.service';
@@ -56,5 +57,11 @@ export class DevicesController {
   @Permissions('devices:read')
   alarms(@Param('id') id: string, @Query() query: ListQueryDto) {
     return this.devicesService.findAlarms(id, query);
+  }
+
+  @Get(':id/calibrations')
+  @Permissions('devices:read')
+  calibrations(@Param('id') id: string, @Query() query: DeviceCalibrationQueryDto) {
+    return this.devicesService.findCalibrations(id, query);
   }
 }
